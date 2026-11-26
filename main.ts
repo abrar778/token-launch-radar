@@ -1,17 +1,20 @@
-// Token Radar: build the entry's outputs from the sealed snapshot. (radar-3)
+// Token Radar: build the entry's outputs from the sealed snapshot. (radar-4)
 //
 //   node main.ts --input <snapshot.json|directory> --output <dir>
 //
-// Reads the snapshot, scores every pre-token protocol with the comps model in lib/model.ts,
-// writes the ranked board to board.json, the dashboard's dataset to data.js, and copies this
-// repository's dashboard/ and screenshots/ beside them. Last it writes dossier.json, the summary
-// the judge reads, with the vendored make.fun library — the scorer rebuilds the same dossier from
-// these outputs and compares bytes, so the dossier is written last and from nothing else.
+// Reads the snapshot, scores every pre-token protocol with the chain-peer model in
+// lib/model.ts, writes the ranked board to board.json, the dashboard's dataset to data.js,
+// and copies this repository's dashboard/ and screenshots/ beside them. Last it writes
+// dossier.json, the summary the judge reads, with the vendored make.fun library — the scorer
+// rebuilds the same dossier from these outputs and compares bytes, so the dossier is written
+// last and from nothing else.
 //
-// The board is 183 rows: the whole 40-protocol watchlist, 134 pre-token protocols below the
-// watchlist floor, and 9 pre-token families the snapshot records only as a product line above it.
-// Every one of the snapshot's 342 no-token records is accounted for — ranked, or set aside as a
-// wrapped, staked, bridged, exchange, CEX, liquid-staking, versioned, or token product.
+// The board is 196 rows: the whole 40-protocol watchlist, 143 pre-token protocols below the
+// watchlist floor (including 9 versioned deployments — a V2 is a new deployment and a new farm
+// target), and 13 pre-token families the snapshot records only as a product line above it.
+// Every one of the snapshot's 342 no-token records is accounted for — ranked, or set aside as
+// a wrapped, staked, bridged, exchange, CEX or liquid-staking product, a token, or an
+// above-floor product line of a token-trading family.
 //
 // Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts --input ../input/snapshot.json
@@ -92,6 +95,6 @@ writeFileSync(
 );
 
 process.stdout.write(
-  `token radar: ${snapshot.protocols.length} protocols, ${snapshot.watchlist.length} on the watchlist, ${board.length} rows scored (${radar.early_size} early, ${radar.above_floor_size} above-floor families, ${radar.live_size} live set aside)\n` +
+  `token radar: ${snapshot.protocols.length} protocols, ${snapshot.watchlist.length} on the watchlist, ${board.length} rows scored (${radar.early_size} early, ${radar.versioned_size} versioned, ${radar.above_floor_size} above-floor families, ${radar.live_size} live set aside)\n` +
     `token radar: wrote ${join(out, 'board.json')}, ${join(out, 'data.js')}, ${join(out, 'dashboard')} (${dashFiles.length} files), ${join(out, 'screenshots')} (${shots.length} images) and ${join(out, 'dossier.json')}\n`,
 );
