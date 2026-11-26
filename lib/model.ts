@@ -1,11 +1,20 @@
 // The token radar's model: one sealed snapshot of the protocol universe in, one ranked board out.
 //
 // The board covers every slug in the snapshot's watchlist (the floor, never a ceiling) and adds
-// pre-token protocols below the watchlist floor: the early rows the radar exists to find. A protocol
-// is pre-token when its index entry records no token (no market cap, no CoinGecko id, no symbol), and
-// rankable when it is also not a wrapped, staked or bridged product of one that trades, carries no
-// version marker and does not begin with an exchange's name. The snapshot's live-token protocols are
-// kept apart and shown as the market's own values, never mixed into the ranked board.
+// every other pre-token protocol the snapshot shows: the early rows below the watchlist floor, and
+// the pre-token families the snapshot records only as a product line above the floor. A protocol
+// is pre-token when its index entry records no token (no market cap, no CoinGecko id, no symbol),
+// and rankable when it is also not a wrapped, staked or bridged product of one that trades,
+// carries no version marker and does not begin with an exchange's name. A stablecoin or yield
+// token is set aside, not ranked: a token cannot be pre-token. The snapshot's live-token
+// protocols are kept apart and shown as the market's own values, never mixed into the ranked board.
+//
+// Coverage, from the snapshot's own figures: 342 protocols record no token. 183 are ranked
+// (the 40 on the watchlist, 134 early rows below the floor, 9 pre-token families above it).
+// 159 are set aside: 144 fail the strict rule (wrapped, staked, bridged, exchange, CEX,
+// liquid-staking, or versioned products), 11 are above-floor product lines that are tokens or
+// products of a token-trading family, and 4 are stablecoin tokens below the floor. The board is
+// every standalone pre-token protocol the snapshot shows, and the set-aside is named, not hidden.
 //
 // Implied value is comps-calibrated, per sector, from the snapshot's own live-token protocols:
 //
@@ -22,7 +31,9 @@
 //   implied      = max(1, round(base x growthMult x maturityMult x breadthMult))
 //
 // The constants are the model's, stated in the dashboard and changeable in the model sandbox. No
-// protocol name is ever special-cased: the same function scores every row.
+// protocol name is ever special-cased: the same function scores every row. The board's selection
+// names its few vetted families in the open (ABOVE_FLOOR_INCLUDE, TOKEN_PRODUCT_EXCLUDE), with a
+// reason each; the value of a row never depends on its name.
 
 /** The snapshot's protocol entry: exactly the ten fields the sealed input carries. */
 export interface SnapshotProtocol {
@@ -79,7 +90,7 @@ export const MODEL: ModelConstants = {
 };
 
 /** The model's version label: the dashboard names it and the rules quote it. */
-export const MODEL_VERSION = 'radar-2';
+export const MODEL_VERSION = 'radar-3';
 
 /** How many pre-token protocols below the watchlist floor the early radar carries, by TVL. */
 export const EARLY_ROWS = 160;
@@ -169,6 +180,16 @@ export interface Comps {
   rows: CategoryComp[];
 }
 
+/** How the snapshot's no-token records split into ranked rows and set-aside ones. */
+export interface Coverage {
+  no_token: number;
+  ranked: number;
+  set_aside: number;
+  excluded_rule: number;
+  excluded_product: number;
+  excluded_token: number;
+}
+
 /** Everything the dashboard needs: the board, the live set, the comps and the model it runs. */
 export interface RadarData {
   as_of: string;
@@ -179,7 +200,9 @@ export interface RadarData {
   watchlist_size: number;
   board_size: number;
   early_size: number;
+  above_floor_size: number;
   live_size: number;
+  coverage: Coverage;
   comps: Comps;
   rows: RadarRow[];
   live: LiveRow[];
@@ -318,6 +341,41 @@ export function isRankable(p: SnapshotProtocol): boolean {
   return true;
 }
 
+/**
+ * The pre-token families the snapshot records only as a product line above the watchlist floor.
+ * Each is a protocol family with no token: the snapshot carries no standalone record of the
+ * family, only this product line, so the product line is the family's record and belongs on the
+ * board. The family, not the product name, is what has no token.
+ *
+ * The other above-floor rankable product lines are left out, and why: Theo Network thUSD,
+ * Avant avUSD and USDCx are tokens, not protocols; Circle Gateway is Circle's (USDC) product and
+ * Stellar DeFi Hub is Stellar's (XLM trades); IPOR Fusion and Solv Strategies are products of
+ * protocols whose tokens trade; BitFi Basis, Arcus Perps, AZverse Perps and Nado Spot are of
+ * unknown standing, and where the record leaves doubt the board leaves the row out.
+ */
+export const ABOVE_FLOOR_INCLUDE: ReadonlyArray<{ slug: string; why: string }> = [
+  { slug: 'sentora-curator', why: 'Sentora, a risk-curator protocol with no token' },
+  { slug: 'polymarket-international', why: 'Polymarket, the prediction market with no token' },
+  { slug: 'cian-yield-layer', why: 'CIAN, a yield aggregator with no token' },
+  { slug: 'defi-saver-asset-management', why: 'DeFi Saver, a DeFi management app with no token' },
+  { slug: 'mellow-core', why: 'Mellow, an onchain capital allocator with no token' },
+  { slug: 'figure-markets-prime', why: 'Figure Markets, a marketplace with no token; the larger of its two product lines' },
+  { slug: 'figure-markets-exchange', why: 'Figure Markets, a marketplace with no token; the exchange line' },
+  { slug: 'extended-perps', why: 'Extended, a perps exchange with no token' },
+  { slug: 'loopscale-lending', why: 'Loopscale, a lending protocol with no token' },
+];
+
+/**
+ * Stablecoin and yield tokens the snapshot records as protocols: each IS a token, not a protocol
+ * waiting to launch one, so it is set aside, not ranked. A token cannot be pre-token.
+ */
+export const TOKEN_PRODUCT_EXCLUDE: ReadonlyArray<{ slug: string; why: string }> = [
+  { slug: 'theo-network-thbill', why: 'thBill is Theo Network\u2019s stablecoin, a token' },
+  { slug: 'avant-aveth', why: 'avETH is Avant\u2019s yield token, a token' },
+  { slug: 'aegis-yusd', why: 'YUSD is Aegis\u2019s stablecoin, a token' },
+  { slug: 'flying-tulip-ftusd', why: 'ftUSD is Flying Tulip\u2019s stablecoin, a token' },
+];
+
 /** The snapshot's protocol by slug. */
 function bySlug(protocols: SnapshotProtocol[]): Map<string, SnapshotProtocol> {
   return new Map(protocols.map((p) => [p.slug, p]));
@@ -341,13 +399,22 @@ export function buildBoard(snapshot: Snapshot, model: ModelConstants = MODEL, co
     const p = index.get(slug);
     if (p !== undefined) chosen.set(slug, p);
   }
-  // The early radar: pre-token protocols below the watchlist floor, by TVL, capped. Never a
-  // replacement for a watchlist row: a chosen protocol stays chosen.
+  const tokenExcluded = new Set(TOKEN_PRODUCT_EXCLUDE.map((e) => e.slug));
+  // The early radar: pre-token protocols below the watchlist floor, by TVL, capped. A stablecoin
+  // or yield token is set aside, not ranked: a token cannot be pre-token. Never a replacement for
+  // a watchlist row: a chosen protocol stays chosen.
   const early = snapshot.protocols
-    .filter((p) => !chosen.has(p.slug) && isRankable(p) && p.tvl_usd < snapshot.floor_usd)
+    .filter((p) => !chosen.has(p.slug) && isRankable(p) && !tokenExcluded.has(p.slug) && p.tvl_usd < snapshot.floor_usd)
     .sort((a, b) => b.tvl_usd - a.tvl_usd || (a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0))
     .slice(0, EARLY_ROWS);
   for (const p of early) chosen.set(p.slug, p);
+  // Above the floor, outside the watchlist: the pre-token families the snapshot records only as
+  // a product line. Each is vetted above (the family has no token); the product lines that are
+  // tokens, products of a token-trading family, or of unknown standing are left out.
+  for (const entry of ABOVE_FLOOR_INCLUDE) {
+    const p = index.get(entry.slug);
+    if (p !== undefined && !chosen.has(entry.slug) && isRankable(p)) chosen.set(entry.slug, p);
+  }
 
   const scored = [...chosen.values()].map((p) => {
     const v = impliedValue(p, snapshot.as_of, model, comps);
@@ -412,6 +479,12 @@ function holdDaysFor(age: number | null): number {
   return 30;
 }
 
+/** What a farm action costs in gas on a chain: Ethereum mainnet is dear, every other chain is cheap. */
+function gasFor(chain: string): { first: string; setup: string; weekly: string } {
+  if (chain === 'Ethereum') return { first: '$5', setup: '$5', weekly: '$3' };
+  return { first: '$0.50', setup: '$0.50', weekly: '$0.25' };
+}
+
 /** One category's qualifying action, matched by words in the category name. */
 interface CategoryAction {
   match: RegExp;
@@ -443,31 +516,33 @@ function actionFor(p: SnapshotProtocol, capital: number, chain: string): string 
 /**
  * A protocol's farm plan: six steps, each an action with a cost and a time. The plan is derived from
  * the protocol's own record (category, chains, TVL, age), never from a hand-written list of names.
+ * Gas follows the chain the protocol names: dear on Ethereum mainnet, cheap everywhere else.
  */
 export function farmSteps(p: SnapshotProtocol, age: number | null): FarmStep[] {
   const chain = chainOf(p);
   const capital = capitalFor(p);
   const hold = holdDaysFor(age);
   const action = actionFor(p, capital, chain);
+  const gas = gasFor(chain);
   return [
     {
       text: `Use a fresh wallet that holds only the funds you plan to farm, and keep its seed phrase offline.`,
-      cost: 'under $3 of gas for the first transaction',
+      cost: `about ${gas.first} of gas for the first transaction`,
       time: '5 minutes',
     },
     {
       text: action,
-      cost: `$${capital} of capital and about $${capital >= 150 ? 8 : 4} of gas`,
+      cost: `$${capital} of capital and about ${gas.setup} of gas`,
       time: '15 minutes to set up',
     },
     {
       text: `Make one qualifying action each week, such as a deposit, a borrow, a swap or a vote.`,
-      cost: 'about $2 of gas a week',
+      cost: `about ${gas.weekly} of gas a week`,
       time: '10 minutes a week',
     },
     {
       text: `Hold the position for at least ${hold} days so the activity is counted in more than one snapshot.`,
-      cost: `the $${capital} stays in the position`,
+      cost: `the $${capital} stays locked for ${hold} days, with no fee but no use elsewhere`,
       time: `${hold} days`,
     },
     {
@@ -527,7 +602,27 @@ export function buildRadar(snapshot: Snapshot, model: ModelConstants = MODEL): {
   const comps = buildComps(snapshot, model);
   const board = buildBoard(snapshot, model, comps);
   const live = liveRows(snapshot);
-  const early = board.filter((r) => !snapshot.watchlist.includes(r.slug)).length;
+  const watchlist = new Set(snapshot.watchlist);
+  const early = board.filter((r) => !watchlist.has(r.slug) && r.tvl_usd < snapshot.floor_usd).length;
+  const aboveFloor = board.filter((r) => !watchlist.has(r.slug) && r.tvl_usd >= snapshot.floor_usd).length;
+  const noToken = snapshot.protocols.filter(isPreToken).length;
+  const excludedRule = snapshot.protocols.filter((p) => isPreToken(p) && !isRankable(p)).length;
+  const includedAbove = new Set(ABOVE_FLOOR_INCLUDE.map((e) => e.slug));
+  const excludedProduct = snapshot.protocols.filter(
+    (p) => isRankable(p) && p.tvl_usd >= snapshot.floor_usd && !watchlist.has(p.slug) && !includedAbove.has(p.slug),
+  ).length;
+  const excludedToken = TOKEN_PRODUCT_EXCLUDE.filter((e) => {
+    const p = snapshot.protocols.find((q) => q.slug === e.slug);
+    return p !== undefined && isRankable(p) && p.tvl_usd < snapshot.floor_usd;
+  }).length;
+  const coverage: Coverage = {
+    no_token: noToken,
+    ranked: board.length,
+    set_aside: noToken - board.length,
+    excluded_rule: excludedRule,
+    excluded_product: excludedProduct,
+    excluded_token: excludedToken,
+  };
   const radar: RadarData = {
     as_of: snapshot.as_of,
     source: snapshot.source,
@@ -537,7 +632,9 @@ export function buildRadar(snapshot: Snapshot, model: ModelConstants = MODEL): {
     watchlist_size: snapshot.watchlist.length,
     board_size: board.length,
     early_size: early,
+    above_floor_size: aboveFloor,
     live_size: live.length,
+    coverage,
     comps,
     rows: board.map(radarRow),
     live,
